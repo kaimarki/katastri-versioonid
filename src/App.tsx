@@ -1,5 +1,5 @@
 // App.tsx — Historic Cadastre Viewer with US2 + US3 changes
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Map from 'ol/Map'
 import View from 'ol/View'
 import TileLayer from 'ol/layer/Tile'
@@ -38,7 +38,7 @@ const GRAY_LAYERS = 'kaart_ht'
 const GRAY_VERSION = '1.1.1'
 
 const CAD_WMS_URL = 'https://gsavalik.envir.ee/geoserver/kataster/wms?'
-const CAD_LAYERS = 'kataster:ky_kehtiv'
+const CAD_LAYERS = 'kataster:ky_versioonid'
 const CAD_VERSION = '1.1.1'
 
 // ===== WFS (US2/US3) =====
@@ -51,7 +51,7 @@ type KyFeatureProps = {
   kehtiv_alates: string | null
   kehtiv_kuni: string | null
   omviis?: string | null
-  [key: string]: any
+  [key: string]: unknown
 }
 type WfsFeature = { id: string; properties: KyFeatureProps }
 type WfsResponse = { type: 'FeatureCollection'; features: WfsFeature[] }
@@ -74,7 +74,7 @@ function saveView(center?: [number, number], zoom?: number) {
 }
 
 // Build WFS URL for list
-function buildWfsUrl(tunnus: string) {
+function buildWfsUrl(tunnus: string, date?: string) {
   const base = new URL(WFS_URL)
   base.searchParams.set('service', 'WFS')
   base.searchParams.set('version', '1.1.0')
@@ -84,7 +84,10 @@ function buildWfsUrl(tunnus: string) {
   base.searchParams.set('srsName', 'EPSG:3301')
   base.searchParams.set('propertyName', 'tunnus,kehtiv_alates,kehtiv_kuni,omviis')
   const safe = tunnus.replace(/'/g, "''")
-  base.searchParams.set('CQL_FILTER', `tunnus = '${safe}'`)
+  const cql = date
+    ? `tunnus = '${safe}' AND kehtiv_alates <= '${date}' AND (kehtiv_kuni IS NULL OR kehtiv_kuni > '${date}')`
+    : `tunnus = '${safe}'`
+  base.searchParams.set('CQL_FILTER', cql)
   base.searchParams.set('sortBy', 'kehtiv_alates D')
   base.searchParams.set('maxFeatures', '200')
   return base.toString()
@@ -117,13 +120,21 @@ export default function App() {
   const cadRef = useRef<TileLayer<TileWMS> | null>(null)
 
   const vecSrcRef = useRef(new VectorSource())
-  const vecLayerRef = useRef<VectorLayer<any> | null>(null)
+  const vecLayerRef = useRef<VectorLayer<VectorSource> | null>(null)
 
   const [showGray, setShowGray] = useState(true)
   const [showCad, setShowCad] = useState(true)
-  const [panelOpen, setPanelOpen] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false) // layers panel
+  const [dateOpen, setDateOpen] = useState(false)   // as-of date panel
 
   const [term, setTerm] = useState('')
+
+  const [asOf, setAsOf] = useState(() => {
+    const d = new Date()
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+    return d.toISOString().slice(0, 10)
+  })
+
   const [rows, setRows] = useState<KyFeatureProps[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -131,7 +142,7 @@ export default function App() {
 
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [colorByKey, setColorByKey] = useState<Record<string, string>>({})
-  const [drawer, setDrawer] = useState<{ open: boolean; props?: Record<string, any> }>({ open: false })
+  const [drawer, setDrawer] = useState<{ open: boolean; props?: Record<string, unknown> }>({ open: false })
 
   // Toast
   const [toast, setToast] = useState<string | null>(null)
@@ -224,19 +235,28 @@ export default function App() {
 
   useEffect(() => { if (grayRef.current) grayRef.current.setVisible(showGray) }, [showGray])
   useEffect(() => { if (cadRef.current) cadRef.current.setVisible(showCad) }, [showCad])
+  useEffect(() => {
+    const src = cadRef.current?.getSource()
+    if (src) {
+      const filter = asOf
+        ? `kehtiv_alates <= '${asOf}' AND (kehtiv_kuni IS NULL OR kehtiv_kuni > '${asOf}')`
+        : undefined
+      src.updateParams({ CQL_FILTER: filter })
+    }
+  }, [asOf])
 
   useEffect(() => {
-  vecLayerRef.current?.changed()
-}, [colorByKey])
+    vecLayerRef.current?.changed()
+  }, [colorByKey])
 
 
   // Search
-  async function doSearch() {
+  const doSearch = useCallback(async () => {
     setError(null); setRows([])
     if (!isValidTunnus) { setError('Palun sisesta täielik tunnus kujul 79501:027:0011'); return }
     setLoading(true)
     try {
-      const url = buildWfsUrl(term)
+      const url = buildWfsUrl(term, asOf || undefined)
       const r = await fetch(url)
       if (!r.ok) throw new Error(`WFS error ${r.status}`)
       const json = (await r.json()) as WfsResponse
@@ -257,12 +277,12 @@ export default function App() {
         return 0
       })
       setRows(items)
-    } catch (e: any) {
-      setError(e.message || 'Päring ebaõnnestus')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Päring ebaõnnestus')
     } finally {
       setLoading(false)
     }
-  }
+  }, [asOf, isValidTunnus, term])
 
   // Toggle version on map
   async function toggleVersion(row: KyFeatureProps) {
@@ -303,8 +323,8 @@ export default function App() {
       const exts = feats.map(f => f.getGeometry()!.getExtent())
       const union = boundingExtent(exts)
       mapRef.current?.getView().fit(union, { duration: 350, padding: [40, 40, 200, 40], maxZoom: 17 })
-    } catch (e: any) {
-      setError(e.message || 'Versiooni laadimine ebaõnnestus')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Versiooni laadimine ebaõnnestus')
     }
   }
 
@@ -342,8 +362,21 @@ export default function App() {
           {/* Top-right toolbar */}
           <div className="absolute top-3 right-3 flex flex-col items-center gap-2 z-10">
             <button
+              aria-label="Select date"
+              onClick={() => setDateOpen(s => { const n = !s; if (n) setPanelOpen(false); return n })}
+              className="p-2 rounded-lg bg-gray-800/80 hover:bg-gray-700/80 border border-gray-600 shadow"
+              title="Vali kuupäev"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="4" width="18" height="17" rx="2" ry="2" stroke="currentColor" strokeWidth="1.5" />
+                <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="1.5" />
+                <line x1="8" y1="4" x2="8" y2="2" stroke="currentColor" strokeWidth="1.5" />
+                <line x1="16" y1="4" x2="16" y2="2" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+            </button>
+            <button
               aria-label="Layers"
-              onClick={() => setPanelOpen(s => !s)}
+              onClick={() => setPanelOpen(s => { const n = !s; if (n) setDateOpen(false); return n })}
               className="p-2 rounded-lg bg-gray-800/80 hover:bg-gray-700/80 border border-gray-600 shadow"
               title="Layers"
             >
@@ -356,6 +389,30 @@ export default function App() {
             <button aria-label="Zoom in"  onClick={handleZoomIn}  className="p-2 rounded-lg bg-gray-800/80 hover:bg-gray-700/80 border border-gray-600 shadow" title="Zoom in">+</button>
             <button aria-label="Zoom out" onClick={handleZoomOut} className="p-2 rounded-lg bg-gray-800/80 hover:bg-gray-700/80 border border-gray-600 shadow" title="Zoom out">−</button>
           </div>
+
+          {/* Date panel */}
+          {dateOpen && (
+            <div className="absolute top-3 right-14 w-64 rounded-xl bg-gray-800/80 text-gray-100 border border-gray-600 shadow-lg backdrop-blur-md p-3 z-10">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium">Kehtiv kuupäev</div>
+                <button aria-label="Close date" className="text-gray-300 hover:text-white" onClick={() => setDateOpen(false)}>✕</button>
+              </div>
+              <div className="space-y-2 text-sm">
+                <input
+                  type="date"
+                  value={asOf}
+                  onChange={(e) => { setAsOf(e.target.value); if (term && isValidTunnus) void doSearch() }}
+                  className="w-full rounded-lg bg-gray-900/70 border border-gray-700 px-3 py-2 outline-none focus:ring-2 focus:ring-sky-500"
+                />
+                <button
+                  onClick={() => { setAsOf(''); if (term && isValidTunnus) void doSearch() }}
+                  className="w-full px-3 py-2 rounded-lg text-sm font-medium bg-gray-700 hover:bg-gray-600 border border-gray-600"
+                >
+                  Puhasta kuupäev
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Layers panel (with Fit & Clear) */}
           {panelOpen && (
@@ -405,6 +462,13 @@ export default function App() {
                 placeholder="nt 79501:027:0011"
                 className="flex-1 rounded-lg bg-gray-900/70 border border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
                 aria-invalid={!isValidTunnus && term.length > 0}
+              />
+              <input
+                type="date"
+                value={asOf}
+                onChange={(e) => { setAsOf(e.target.value); if (term && isValidTunnus) void doSearch() }}
+                className="rounded-lg bg-gray-900/70 border border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+                title="Kehtivuse kuupäev"
               />
               <button
                 type="submit"
