@@ -74,7 +74,7 @@ function saveView(center?: [number, number], zoom?: number) {
 }
 
 // Build WFS URL for list
-function buildWfsUrl(tunnus: string, date?: string) {
+function buildWfsUrl(tunnus: string) {
   const base = new URL(WFS_URL)
   base.searchParams.set('service', 'WFS')
   base.searchParams.set('version', '1.1.0')
@@ -84,9 +84,7 @@ function buildWfsUrl(tunnus: string, date?: string) {
   base.searchParams.set('srsName', 'EPSG:3301')
   base.searchParams.set('propertyName', 'tunnus,kehtiv_alates,kehtiv_kuni,omviis')
   const safe = tunnus.replace(/'/g, "''")
-  const cql = date
-    ? `tunnus = '${safe}' AND kehtiv_alates <= '${date}' AND (kehtiv_kuni IS NULL OR kehtiv_kuni > '${date}')`
-    : `tunnus = '${safe}'`
+  const cql = `tunnus = '${safe}'`
   base.searchParams.set('CQL_FILTER', cql)
   base.searchParams.set('sortBy', 'kehtiv_alates D')
   base.searchParams.set('maxFeatures', '200')
@@ -256,7 +254,7 @@ export default function App() {
     if (!isValidTunnus) { setError('Palun sisesta täielik tunnus kujul 79501:027:0011'); return }
     setLoading(true)
     try {
-      const url = buildWfsUrl(term, asOf || undefined)
+      const url = buildWfsUrl(term)
       const r = await fetch(url)
       if (!r.ok) throw new Error(`WFS error ${r.status}`)
       const json = (await r.json()) as WfsResponse
@@ -282,7 +280,7 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [asOf, isValidTunnus, term])
+  }, [isValidTunnus, term])
 
   // Toggle version on map
   async function toggleVersion(row: KyFeatureProps) {
@@ -401,11 +399,11 @@ export default function App() {
                 <input
                   type="date"
                   value={asOf}
-                  onChange={(e) => { setAsOf(e.target.value); if (term && isValidTunnus) void doSearch() }}
+                  onChange={(e) => setAsOf(e.target.value)}
                   className="w-full rounded-lg bg-gray-900/70 border border-gray-700 px-3 py-2 outline-none focus:ring-2 focus:ring-sky-500"
                 />
                 <button
-                  onClick={() => { setAsOf(''); if (term && isValidTunnus) void doSearch() }}
+                  onClick={() => setAsOf('')}
                   className="w-full px-3 py-2 rounded-lg text-sm font-medium bg-gray-700 hover:bg-gray-600 border border-gray-600"
                 >
                   Puhasta kuupäev
@@ -462,13 +460,6 @@ export default function App() {
                 placeholder="nt 79501:027:0011"
                 className="flex-1 rounded-lg bg-gray-900/70 border border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
                 aria-invalid={!isValidTunnus && term.length > 0}
-              />
-              <input
-                type="date"
-                value={asOf}
-                onChange={(e) => { setAsOf(e.target.value); if (term && isValidTunnus) void doSearch() }}
-                className="rounded-lg bg-gray-900/70 border border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-                title="Kehtivuse kuupäev"
               />
               <button
                 type="submit"
