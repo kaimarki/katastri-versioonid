@@ -124,10 +124,17 @@ export default function App() {
 
   const [showGray, setShowGray] = useState(true)
   const [showCad, setShowCad] = useState(true)
-  const [panelOpen, setPanelOpen] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false) // layers panel
+  const [dateOpen, setDateOpen] = useState(false)   // as-of date panel
 
   const [term, setTerm] = useState('')
-  const [asOf, setAsOf] = useState('')
+
+  const [asOf, setAsOf] = useState(() => {
+    const d = new Date()
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+    return d.toISOString().slice(0, 10)
+  })
+
   const [rows, setRows] = useState<KyFeatureProps[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -355,8 +362,21 @@ export default function App() {
           {/* Top-right toolbar */}
           <div className="absolute top-3 right-3 flex flex-col items-center gap-2 z-10">
             <button
+              aria-label="Select date"
+              onClick={() => setDateOpen(s => { const n = !s; if (n) setPanelOpen(false); return n })}
+              className="p-2 rounded-lg bg-gray-800/80 hover:bg-gray-700/80 border border-gray-600 shadow"
+              title="Vali kuupäev"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="4" width="18" height="17" rx="2" ry="2" stroke="currentColor" strokeWidth="1.5" />
+                <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="1.5" />
+                <line x1="8" y1="4" x2="8" y2="2" stroke="currentColor" strokeWidth="1.5" />
+                <line x1="16" y1="4" x2="16" y2="2" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+            </button>
+            <button
               aria-label="Layers"
-              onClick={() => setPanelOpen(s => !s)}
+              onClick={() => setPanelOpen(s => { const n = !s; if (n) setDateOpen(false); return n })}
               className="p-2 rounded-lg bg-gray-800/80 hover:bg-gray-700/80 border border-gray-600 shadow"
               title="Layers"
             >
@@ -369,6 +389,30 @@ export default function App() {
             <button aria-label="Zoom in"  onClick={handleZoomIn}  className="p-2 rounded-lg bg-gray-800/80 hover:bg-gray-700/80 border border-gray-600 shadow" title="Zoom in">+</button>
             <button aria-label="Zoom out" onClick={handleZoomOut} className="p-2 rounded-lg bg-gray-800/80 hover:bg-gray-700/80 border border-gray-600 shadow" title="Zoom out">−</button>
           </div>
+
+          {/* Date panel */}
+          {dateOpen && (
+            <div className="absolute top-3 right-14 w-64 rounded-xl bg-gray-800/80 text-gray-100 border border-gray-600 shadow-lg backdrop-blur-md p-3 z-10">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium">Kehtiv kuupäev</div>
+                <button aria-label="Close date" className="text-gray-300 hover:text-white" onClick={() => setDateOpen(false)}>✕</button>
+              </div>
+              <div className="space-y-2 text-sm">
+                <input
+                  type="date"
+                  value={asOf}
+                  onChange={(e) => { setAsOf(e.target.value); if (term && isValidTunnus) void doSearch() }}
+                  className="w-full rounded-lg bg-gray-900/70 border border-gray-700 px-3 py-2 outline-none focus:ring-2 focus:ring-sky-500"
+                />
+                <button
+                  onClick={() => { setAsOf(''); if (term && isValidTunnus) void doSearch() }}
+                  className="w-full px-3 py-2 rounded-lg text-sm font-medium bg-gray-700 hover:bg-gray-600 border border-gray-600"
+                >
+                  Puhasta kuupäev
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Layers panel (with Fit & Clear) */}
           {panelOpen && (
