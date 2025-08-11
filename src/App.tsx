@@ -127,7 +127,11 @@ export default function App() {
   const [panelOpen, setPanelOpen] = useState(false)
 
   const [term, setTerm] = useState('')
-  const [asOf, setAsOf] = useState('')
+  const [asOf, setAsOf] = useState(() => {
+    const d = new Date()
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+    return d.toISOString().slice(0, 10)
+  })
   const [rows, setRows] = useState<KyFeatureProps[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
