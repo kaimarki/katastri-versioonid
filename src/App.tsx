@@ -12,6 +12,8 @@ import { ScaleLine, Attribution } from 'ol/control'
 import VectorSource from 'ol/source/Vector'
 import VectorLayer from 'ol/layer/Vector'
 import GeoJSON from 'ol/format/GeoJSON'
+import Overlay from 'ol/Overlay'
+import type MapBrowserEvent from 'ol/MapBrowserEvent'
 import { Style, Stroke, Fill } from 'ol/style'
 import { boundingExtent } from 'ol/extent'
 
@@ -112,9 +114,32 @@ function buildWfsUrl_fullByVersion(tunnus: string, ka: string|null, kk: string|n
   return base.toString()
 }
 
+// Build WFS URL to identify unit by point
+function buildWfsUrl_byPoint(x: number, y: number, date?: string) {
+  const base = new URL(WFS_URL)
+  base.searchParams.set('service', 'WFS')
+  base.searchParams.set('version', '1.1.0')
+  base.searchParams.set('request', 'GetFeature')
+  base.searchParams.set('typeName', WFS_TYPENAME)
+  base.searchParams.set('outputFormat', 'application/json')
+  base.searchParams.set('srsName', 'EPSG:3301')
+  base.searchParams.set('propertyName', 'tunnus,kehtiv_alates,kehtiv_kuni')
+  base.searchParams.set('bbox', `${x},${y},${x},${y},EPSG:3301`)
+  const cql = date
+    ? `kehtiv_alates <= '${date}' AND (kehtiv_kuni IS NULL OR kehtiv_kuni > '${date}')`
+    : undefined
+  if (cql) base.searchParams.set('CQL_FILTER', cql)
+  base.searchParams.set('sortBy', 'kehtiv_alates D')
+  base.searchParams.set('maxFeatures', '1')
+  return base.toString()
+}
+
 export default function App() {
   const mapDivRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<Map | null>(null)
+
+  const popupRef = useRef<HTMLDivElement | null>(null)
+  const overlayRef = useRef<Overlay | null>(null)
 
   const grayRef = useRef<TileLayer<TileWMS> | null>(null)
   const cadRef = useRef<TileLayer<TileWMS> | null>(null)
@@ -139,6 +164,8 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const isValidTunnus = useMemo(() => TUNNUS_RE.test(term), [term])
+
+  const [popupData, setPopupData] = useState<{ tunnus: string } | null>(null)
 
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [colorByKey, setColorByKey] = useState<Record<string, string>>({})
@@ -171,7 +198,34 @@ export default function App() {
     vecLayerRef.current?.changed()
   }
 
-  
+  const closePopup = useCallback(() => {
+    overlayRef.current?.setPosition(undefined)
+    setPopupData(null)
+  }, [])
+
+  function handlePopupTunnusClick(t: string) {
+    setTerm(t)
+    void doSearch(t)
+    closePopup()
+  }
+
+  const handleMapClick = useCallback(async (evt: MapBrowserEvent<UIEvent>) => {
+    const [x, y] = evt.coordinate as [number, number]
+    closePopup()
+    try {
+      const url = buildWfsUrl_byPoint(x, y, asOf || undefined)
+      const r = await fetch(url)
+      if (!r.ok) return
+      const json = (await r.json()) as WfsResponse
+      const feat = json.features?.[0]
+      if (feat) {
+        setPopupData({ tunnus: feat.properties.tunnus })
+        overlayRef.current?.setPosition([x, y])
+      }
+    } catch {
+      // ignore
+    }
+  }, [asOf, closePopup])
 
   // Map init
   useEffect(() => {
@@ -228,6 +282,15 @@ export default function App() {
         new Attribution({ collapsible: false, className: 'custom-attribution ol-attribution--no-button' }),
       ],
     })
+    if (popupRef.current) {
+      overlayRef.current = new Overlay({
+        element: popupRef.current,
+        positioning: 'bottom-center',
+        offset: [0, -10],
+        stopEvent: true,
+      })
+      map.addOverlay(overlayRef.current)
+    }
     mapRef.current = map
     map.on('moveend', () => saveView(view.getCenter() as [number, number], view.getZoom()))
     return () => map.setTarget(undefined)
@@ -249,14 +312,27 @@ export default function App() {
     vecLayerRef.current?.changed()
   }, [colorByKey])
 
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    map.on('singleclick', handleMapClick)
+    map.on('pointerdrag', closePopup)
+    return () => {
+      map.un('singleclick', handleMapClick)
+      map.un('pointerdrag', closePopup)
+    }
+  }, [handleMapClick, closePopup])
+
 
   // Search
-  const doSearch = useCallback(async () => {
+  const doSearch = useCallback(async (tunnusOverride?: string) => {
+    const q = (tunnusOverride ?? term).trim()
+    const valid = TUNNUS_RE.test(q)
     setError(null); setRows([])
-    if (!isValidTunnus) { setError('Palun sisesta täielik tunnus kujul 79501:027:0011'); return }
+    if (!valid) { setError('Palun sisesta täielik tunnus kujul 79501:027:0011'); return }
     setLoading(true)
     try {
-      const url = buildWfsUrl(term, asOf || undefined)
+      const url = buildWfsUrl(q, asOf || undefined)
       const r = await fetch(url)
       if (!r.ok) throw new Error(`WFS error ${r.status}`)
       const json = (await r.json()) as WfsResponse
@@ -282,7 +358,7 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [asOf, isValidTunnus, term])
+  }, [asOf, term])
 
   // Toggle version on map
   async function toggleVersion(row: KyFeatureProps) {
@@ -358,6 +434,24 @@ export default function App() {
         <div className="relative h-full w-full rounded-2xl overflow-hidden shadow-xl border border-gray-700">
           {/* Map */}
           <div ref={mapDivRef} className="absolute inset-0" />
+          <div ref={popupRef} className="" >
+            {popupData && (
+              <div className="relative pointer-events-auto bg-gray-800/90 border border-gray-600 rounded-md px-2 py-1 text-sm text-gray-100 shadow">
+                <button
+                  className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-gray-700 text-gray-300 hover:text-white"
+                  onClick={closePopup}
+                >
+                  ✕
+                </button>
+                <button
+                  className="underline font-mono"
+                  onClick={() => handlePopupTunnusClick(popupData.tunnus)}
+                >
+                  {popupData.tunnus}
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Top-right toolbar */}
           <div className="absolute top-3 right-3 flex flex-col items-center gap-2 z-10">
