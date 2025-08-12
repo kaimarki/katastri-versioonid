@@ -124,11 +124,11 @@ function buildWfsUrl_byPoint(x: number, y: number, date?: string) {
   base.searchParams.set('outputFormat', 'application/json')
   base.searchParams.set('srsName', 'EPSG:3301')
   base.searchParams.set('propertyName', 'tunnus,kehtiv_alates,kehtiv_kuni')
-  base.searchParams.set('bbox', `${x},${y},${x},${y},EPSG:3301`)
-  const cql = date
-    ? `kehtiv_alates <= '${date}' AND (kehtiv_kuni IS NULL OR kehtiv_kuni > '${date}')`
-    : undefined
-  if (cql) base.searchParams.set('CQL_FILTER', cql)
+  const cqlParts = [`INTERSECTS(geom,SRID=3301;POINT(${x} ${y}))`]
+  if (date) {
+    cqlParts.push(`kehtiv_alates <= '${date}' AND (kehtiv_kuni IS NULL OR kehtiv_kuni > '${date}')`)
+  }
+  base.searchParams.set('CQL_FILTER', cqlParts.join(' AND '))
   base.searchParams.set('sortBy', 'kehtiv_alates D')
   base.searchParams.set('maxFeatures', '1')
   return base.toString()
@@ -209,8 +209,7 @@ export default function App() {
     closePopup()
   }
 
-
-  const handleMapClick = useCallback(async (evt: MapBrowserEvent<UIEvent>) => {
+  const handleMapClick = useCallback(async (evt: MapBrowserEvent<PointerEvent>) => {
     const [x, y] = evt.coordinate as [number, number]
     closePopup()
     try {
@@ -316,11 +315,11 @@ export default function App() {
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    map.on('singleclick', handleMapClick)
-    map.on('pointerdrag', closePopup)
+    map.on('singleclick', handleMapClick as any)
+    map.on('pointerdrag', closePopup as any)
     return () => {
-      map.un('singleclick', handleMapClick)
-      map.un('pointerdrag', closePopup)
+      map.un('singleclick', handleMapClick as any)
+      map.un('pointerdrag', closePopup as any)
     }
   }, [handleMapClick, closePopup])
 
