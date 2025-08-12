@@ -209,7 +209,8 @@ export default function App() {
     closePopup()
   }
 
-  const handleMapClick = useCallback(async (evt: MapBrowserEvent<any>) => {
+
+  const handleMapClick = useCallback(async (evt: MapBrowserEvent<UIEvent>) => {
     const [x, y] = evt.coordinate as [number, number]
     closePopup()
     try {
