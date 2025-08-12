@@ -463,13 +463,6 @@ export default function App() {
                 className="flex-1 rounded-lg bg-gray-900/70 border border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
                 aria-invalid={!isValidTunnus && term.length > 0}
               />
-              <input
-                type="date"
-                value={asOf}
-                onChange={(e) => { setAsOf(e.target.value); if (term && isValidTunnus) void doSearch() }}
-                className="rounded-lg bg-gray-900/70 border border-gray-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500"
-                title="Kehtivuse kuupäev"
-              />
               <button
                 type="submit"
                 disabled={!isValidTunnus || loading}
