@@ -209,8 +209,7 @@ export default function App() {
     closePopup()
   }
 
-
-  const handleMapClick = useCallback(async (evt: MapBrowserEvent<UIEvent>) => {
+  const handleMapClick = useCallback(async (evt: MapBrowserEvent<PointerEvent>) => {
     const [x, y] = evt.coordinate as [number, number]
     closePopup()
     try {
@@ -316,11 +315,11 @@ export default function App() {
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    map.on('singleclick', handleMapClick)
-    map.on('pointerdrag', closePopup)
+    map.on('singleclick', handleMapClick as any)
+    map.on('pointerdrag', closePopup as any)
     return () => {
-      map.un('singleclick', handleMapClick)
-      map.un('pointerdrag', closePopup)
+      map.un('singleclick', handleMapClick as any)
+      map.un('pointerdrag', closePopup as any)
     }
   }, [handleMapClick, closePopup])
 
