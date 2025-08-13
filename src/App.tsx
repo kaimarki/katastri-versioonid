@@ -66,9 +66,27 @@ const COLORS = ['#22c55e', '#3b82f6'] // green, blue
 // Detail table config
 const DETAIL_HIDDEN_COLS = ['id', 'kirje_muudetud']
 const DETAIL_COL_WIDTHS: Record<string, number> = {
-  tunnus: 160,
-  kehtiv_alates: 120,
-  kehtiv_kuni: 120,
+  tunnus: 20,
+  hkood: 4, 
+  mk_nimi: 20,
+  ov_nimi: 20,
+  ay_nimi: 20,
+  l_aadress: 20,
+  ads_oid: 12,
+  kehtiv_alates: 10,
+  kehtiv_kuni: 10,
+  siht1: 25,
+  siht2: 25,
+  siht3: 25,
+  so_prts1: 3,
+  so_prts2: 3,
+  so_prts3: 3,
+  kinnistu: 20,
+  omviis: 20,
+  omvorm: 20,
+  maks_hind: 20,
+  marked: 30,
+  pindala: 20
 }
 
 // Persist view
