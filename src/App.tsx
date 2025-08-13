@@ -63,6 +63,32 @@ const TUNNUS_RE = /^\d{5}:\d{3}:\d{4}$/
 // Map colors for two versions max
 const COLORS = ['#22c55e', '#3b82f6'] // green, blue
 
+// Detail table config
+const DETAIL_HIDDEN_COLS = ['id', 'kirje_muudetud']
+const DETAIL_COL_WIDTHS: Record<string, number> = {
+  tunnus: 20,
+  hkood: 4, 
+  mk_nimi: 20,
+  ov_nimi: 20,
+  ay_nimi: 20,
+  l_aadress: 20,
+  ads_oid: 12,
+  kehtiv_alates: 10,
+  kehtiv_kuni: 10,
+  siht1: 25,
+  siht2: 25,
+  siht3: 25,
+  so_prts1: 3,
+  so_prts2: 3,
+  so_prts3: 3,
+  kinnistu: 20,
+  omviis: 20,
+  omvorm: 20,
+  maks_hind: 20,
+  marked: 30,
+  pindala: 20
+}
+
 // Persist view
 function loadSavedView() {
   try {
@@ -111,6 +137,22 @@ function buildWfsUrl_fullByVersion(tunnus: string, ka: string|null, kk: string|n
     ? `tunnus = '${safeT}' AND kehtiv_alates = '${safeKa}' AND kehtiv_kuni = '${safeKk}'`
     : `tunnus = '${safeT}' AND kehtiv_alates = '${safeKa}' AND kehtiv_kuni IS NULL`
   base.searchParams.set('CQL_FILTER', cql)
+  return base.toString()
+}
+
+// Build WFS URL for all properties of a tunnus
+function buildWfsUrl_allProps(tunnus: string) {
+  const base = new URL(WFS_URL)
+  base.searchParams.set('service', 'WFS')
+  base.searchParams.set('version', '1.1.0')
+  base.searchParams.set('request', 'GetFeature')
+  base.searchParams.set('typeName', WFS_TYPENAME)
+  base.searchParams.set('outputFormat', 'application/json')
+  base.searchParams.set('srsName', 'EPSG:3301')
+  const safe = tunnus.replace(/'/g, "''")
+  base.searchParams.set('CQL_FILTER', `tunnus = '${safe}'`)
+  base.searchParams.set('sortBy', 'kehtiv_alates D')
+  base.searchParams.set('maxFeatures', '200')
   return base.toString()
 }
 
@@ -169,7 +211,13 @@ export default function App() {
 
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [colorByKey, setColorByKey] = useState<Record<string, string>>({})
-  const [drawer, setDrawer] = useState<{ open: boolean; props?: Record<string, unknown> }>({ open: false })
+  const [drawer, setDrawer] = useState<{ open: boolean; tunnus?: string; rows?: KyFeatureProps[] }>({ open: false })
+  const detailCols = useMemo(
+    () => drawer.rows && drawer.rows.length
+      ? Object.keys(drawer.rows[0]).filter(k => !DETAIL_HIDDEN_COLS.includes(k))
+      : [],
+    [drawer.rows]
+  )
 
   // Toast
   const [toast, setToast] = useState<string | null>(null)
@@ -315,11 +363,11 @@ export default function App() {
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    map.on('singleclick', handleMapClick as any)
-    map.on('pointerdrag', closePopup as any)
+    map.on('singleclick', handleMapClick as unknown as (e: MapBrowserEvent<UIEvent>) => void)
+    map.on('pointerdrag', closePopup as unknown as (e: MapBrowserEvent<UIEvent>) => void)
     return () => {
-      map.un('singleclick', handleMapClick as any)
-      map.un('pointerdrag', closePopup as any)
+      map.un('singleclick', handleMapClick as unknown as (e: MapBrowserEvent<UIEvent>) => void)
+      map.un('pointerdrag', closePopup as unknown as (e: MapBrowserEvent<UIEvent>) => void)
     }
   }, [handleMapClick, closePopup])
 
@@ -372,7 +420,7 @@ export default function App() {
       vecSrcRef.current.getFeatures()
         .filter(f => f.get('___key') === k)
         .forEach(f => vecSrcRef.current.removeFeature(f))
-      if (drawer.open && drawer.props && `${drawer.props.tunnus}|${drawer.props.kehtiv_alates}|${drawer.props.kehtiv_kuni}` === k) {
+      if (drawer.open && drawer.tunnus === row.tunnus && !newKeys.some(x => x.startsWith(`${row.tunnus}|`))) {
         setDrawer({ open: false })
       }
       return
@@ -395,7 +443,14 @@ export default function App() {
       assignColors(newKeys)
       feats.forEach(f => f.set('___key', k))
       vecSrcRef.current.addFeatures(feats)
-      setDrawer({ open: true, props: gj.features[0]?.properties ?? row })
+
+      const detUrl = buildWfsUrl_allProps(row.tunnus)
+      const detRes = await fetch(detUrl)
+      if (!detRes.ok) throw new Error(`WFS error ${detRes.status}`)
+      const detJson = (await detRes.json()) as WfsResponse
+      const detRows = (detJson.features || []).map(f => f.properties as KyFeatureProps)
+      detRows.sort((a, b) => new Date(b.kehtiv_alates ?? '').getTime() - new Date(a.kehtiv_alates ?? '').getTime())
+      setDrawer({ open: true, tunnus: row.tunnus, rows: detRows })
       const exts = feats.map(f => f.getGeometry()!.getExtent())
       const union = boundingExtent(exts)
       mapRef.current?.getView().fit(union, { duration: 350, padding: [40, 40, 200, 40], maxZoom: 17 })
@@ -669,24 +724,38 @@ export default function App() {
             </div>
 
             {/* Panel */}
-            {drawer.open && drawer.props && (
+            {drawer.open && drawer.rows && (
               <div className="mx-auto max-w-[95vw] bg-gray-800/95 text-gray-100 border-t border-gray-700 shadow-[0_-8px_30px_rgba(0,0,0,0.5)] rounded-t-2xl p-4 pointer-events-auto">
                 <div className="text-sm font-medium mb-3">Versiooni detailid</div>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
+                  <table className="text-sm" style={{ borderCollapse: 'collapse' }}>
                     <thead>
-                      <tr className="[&>th]:px-3 [&>th]:py-2 text-gray-300">
-                        {Object.keys(drawer.props).map((k) => (
-                          <th key={k} className="text-left whitespace-nowrap border-b border-gray-700">{k}</th>
+                      <tr className="text-gray-300">
+                        {detailCols.map(k => (
+                          <th
+                            key={k}
+                            style={{ width: `${DETAIL_COL_WIDTHS[k] ?? 140}px` }}
+                            className="px-3 py-2 text-left whitespace-nowrap border-b border-gray-700"
+                          >
+                            {k}
+                          </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="[&>td]:px-3 [&>td]:py-2">
-                        {Object.keys(drawer.props).map((k) => (
-                          <td key={k} className="border-b border-gray-700 align-top break-all">{String(drawer.props?.[k] ?? '')}</td>
-                        ))}
-                      </tr>
+                      {drawer.rows.map((r, i) => (
+                        <tr key={i} className="odd:bg-gray-900/40">
+                          {detailCols.map(k => (
+                            <td
+                              key={k}
+                              style={{ width: `${DETAIL_COL_WIDTHS[k] ?? 140}px` }}
+                              className="px-3 py-2 border-b border-gray-700 whitespace-nowrap"
+                            >
+                              {String(r[k] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
