@@ -257,7 +257,7 @@ export default function App() {
     closePopup()
   }
 
-  const handleMapClick = useCallback(async (evt: MapBrowserEvent<PointerEvent>) => {
+  const handleMapClick = useCallback(async (evt: MapBrowserEvent<MouseEvent>) => {
     const [x, y] = evt.coordinate as [number, number]
     closePopup()
     try {
@@ -363,11 +363,13 @@ export default function App() {
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    map.on('singleclick', handleMapClick as unknown as (e: MapBrowserEvent<UIEvent>) => void)
-    map.on('pointerdrag', closePopup as unknown as (e: MapBrowserEvent<UIEvent>) => void)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const handleDrag = (e: MapBrowserEvent<PointerEvent>) => closePopup()
+    map.on('singleclick', handleMapClick)
+    map.on('pointerdrag', handleDrag)
     return () => {
-      map.un('singleclick', handleMapClick as unknown as (e: MapBrowserEvent<UIEvent>) => void)
-      map.un('pointerdrag', closePopup as unknown as (e: MapBrowserEvent<UIEvent>) => void)
+      map.un('singleclick', handleMapClick)
+      map.un('pointerdrag', handleDrag)
     }
   }, [handleMapClick, closePopup])
 
