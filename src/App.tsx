@@ -364,10 +364,10 @@ export default function App() {
     const map = mapRef.current
     if (!map) return
     const handleDrag = () => closePopup()
-    map.on('singleclick', handleMapClick)
+    map.on('singleclick', handleMapClick as unknown as (e: MapBrowserEvent<MouseEvent>) => void)
     map.on('pointerdrag', handleDrag)
     return () => {
-      map.un('singleclick', handleMapClick)
+      map.un('singleclick', handleMapClick as unknown as (e: MapBrowserEvent<MouseEvent>) => void)
       map.un('pointerdrag', handleDrag)
     }
   }, [handleMapClick, closePopup])
