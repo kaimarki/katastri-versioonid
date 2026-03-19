@@ -715,8 +715,8 @@ export default function App() {
                   </div>
                 </div>
               )}
-            </div>  {/* ← see sulgeb "absolute left-0 right-0 bottom-0" div-i */}
-          )}        {/* ← see sulgeb selectedKeys.length > 0 tingimuse */}
+            </div>  
+          )}        
 
           {/* Toast (top-right) */}
           {toast && (
