@@ -66,13 +66,22 @@ const COLORS = ['#22c55e', '#3b82f6'] // green, blue
 // field labels
 const FIELD_LABELS: Record<string, string> = {
   tunnus:           'Tunnus',
+  hkood:            'Hkood',
+  mk_nimi:          'Maakond',
+  ov_nimi:          'Omavalitsus',
+  l_aadress:        'Lähiaadress',
+  ads_oid:          'ADS oid',
   kehtiv_alates:    'Kehtiv alates',
   kehtiv_kuni:      'Kehtiv kuni',
   omviis:           'Omandamise viis',
+  omvorm:           'Omandivorm',
   pindala:          'Pindala (m²)',
-  sihtotstarve:     'Sihtotstarve',
-  aadress:          'Aadress',
-  olek:             'Olek',
+  siht1:            'Sihtotstarve 1',
+  siht2:            'Sihtotstarve 2',
+  siht3:            'Sihtotstarve 3',
+  kinnistu:         'Kinnistu number',
+  maks_hind:        'Maksustamishind',
+  marked:           'Märked'
 }
 
 // Persist view
