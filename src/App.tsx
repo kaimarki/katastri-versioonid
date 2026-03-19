@@ -63,6 +63,18 @@ const TUNNUS_RE = /^\d{5}:\d{3}:\d{4}$/
 // Map colors for two versions max
 const COLORS = ['#22c55e', '#3b82f6'] // green, blue
 
+// field labels
+const FIELD_LABELS: Record<string, string> = {
+  tunnus:           'Tunnus',
+  kehtiv_alates:    'Kehtiv alates',
+  kehtiv_kuni:      'Kehtiv kuni',
+  omviis:           'Omandamise viis',
+  pindala:          'Pindala (m²)',
+  sihtotstarve:     'Sihtotstarve',
+  aadress:          'Aadress',
+  olek:             'Olek',
+}
+
 // Persist view
 function loadSavedView() {
   try {
@@ -159,6 +171,12 @@ export default function App() {
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
     return d.toISOString().slice(0, 10)
   })
+
+  const todayStr = useMemo(() => {
+  const d = new Date()
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 10)
+}, [])
 
   const [rows, setRows] = useState<KyFeatureProps[]>([])
   const [loading, setLoading] = useState(false)
@@ -458,8 +476,12 @@ export default function App() {
             <button
               aria-label="Select date"
               onClick={() => setDateOpen(s => { const n = !s; if (n) setPanelOpen(false); return n })}
-              className="p-2 rounded-lg bg-gray-800/80 hover:bg-gray-700/80 border border-gray-600 shadow"
-              title="Vali kuupäev"
+              className={`p-2 rounded-lg border shadow transition-colors ${
+                  asOf && asOf !== todayStr
+                    ? 'bg-sky-700/80 border-sky-500 hover:bg-sky-600/80'
+                    : 'bg-gray-800/80 border-gray-600 hover:bg-gray-700/80'
+                }`}
+              title={asOf && asOf !== todayStr ? `Aktiivne filter: ${asOf}` : 'Vali kuupäev'}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <rect x="3" y="4" width="18" height="17" rx="2" ry="2" stroke="currentColor" strokeWidth="1.5" />
@@ -655,7 +677,8 @@ export default function App() {
           )}
 
           {/* Bottom info drawer (wide, horizontal scroll, chevron toggle) */}
-          <div className="absolute left-0 right-0 bottom-0 z-20 pointer-events-none">
+          {selectedKeys.length > 0 && (
+            <div className="absolute left-0 right-0 bottom-0 z-20 pointer-events-none">
             {/* Handle */}
             <div className="mx-auto w-fit pointer-events-auto">
               <button
@@ -667,7 +690,8 @@ export default function App() {
                 <span className="text-lg leading-none">{drawer.open ? '▾' : '▴'}</span>
               </button>
             </div>
-
+          )}
+              
             {/* Panel */}
             {drawer.open && drawer.props && (
               <div className="mx-auto max-w-[95vw] bg-gray-800/95 text-gray-100 border-t border-gray-700 shadow-[0_-8px_30px_rgba(0,0,0,0.5)] rounded-t-2xl p-4 pointer-events-auto">
@@ -677,7 +701,7 @@ export default function App() {
                     <thead>
                       <tr className="[&>th]:px-3 [&>th]:py-2 text-gray-300">
                         {Object.keys(drawer.props).map((k) => (
-                          <th key={k} className="text-left whitespace-nowrap border-b border-gray-700">{k}</th>
+                          <th key={k} className="text-left whitespace-nowrap border-b border-gray-700">{FIELD_LABELS[k] ?? k}</th>
                         ))}
                       </tr>
                     </thead>
