@@ -676,47 +676,47 @@ export default function App() {
             </div>
           )}
 
-          {/* Bottom info drawer (wide, horizontal scroll, chevron toggle) */}
+          {/* Bottom info drawer */}
           {selectedKeys.length > 0 && (
             <div className="absolute left-0 right-0 bottom-0 z-20 pointer-events-none">
-            {/* Handle */}
-            <div className="mx-auto w-fit pointer-events-auto">
-              <button
-                onClick={() => setDrawer(d => ({ ...d, open: !d.open }))}
-                className="mx-auto mb-2 flex items-center gap-2 rounded-full bg-gray-800/95 border border-gray-700 px-3 py-1 text-xs text-gray-100 shadow"
-                title={drawer.open ? 'Peida detailid' : 'Ava detailid'}
-              >
-                {drawer.open ? 'Peida detailid' : 'Versiooni detailid'}
-                <span className="text-lg leading-none">{drawer.open ? '▾' : '▴'}</span>
-              </button>
-            </div>
-          )}
-              
-            {/* Panel */}
-            {drawer.open && drawer.props && (
-              <div className="mx-auto max-w-[95vw] bg-gray-800/95 text-gray-100 border-t border-gray-700 shadow-[0_-8px_30px_rgba(0,0,0,0.5)] rounded-t-2xl p-4 pointer-events-auto">
-                <div className="text-sm font-medium mb-3">Versiooni detailid</div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="[&>th]:px-3 [&>th]:py-2 text-gray-300">
-                        {Object.keys(drawer.props).map((k) => (
-                          <th key={k} className="text-left whitespace-nowrap border-b border-gray-700">{FIELD_LABELS[k] ?? k}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="[&>td]:px-3 [&>td]:py-2">
-                        {Object.keys(drawer.props).map((k) => (
-                          <td key={k} className="border-b border-gray-700 align-top break-all">{String(drawer.props?.[k] ?? '')}</td>
-                        ))}
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+              {/* Handle */}
+              <div className="mx-auto w-fit pointer-events-auto">
+                <button
+                  onClick={() => setDrawer(d => ({ ...d, open: !d.open }))}
+                  className="mx-auto mb-2 flex items-center gap-2 rounded-full bg-gray-800/95 border border-gray-700 px-3 py-1 text-xs text-gray-100 shadow"
+                  title={drawer.open ? 'Peida detailid' : 'Ava detailid'}
+                >
+                  {drawer.open ? 'Peida detailid' : 'Versiooni detailid'}
+                  <span className="text-lg leading-none">{drawer.open ? '▾' : '▴'}</span>
+                </button>
               </div>
-            )}
-          </div>
+          
+              {/* Panel */}
+              {drawer.open && drawer.props && (
+                <div className="mx-auto max-w-[95vw] bg-gray-800/95 text-gray-100 border-t border-gray-700 shadow-[0_-8px_30px_rgba(0,0,0,0.5)] rounded-t-2xl p-4 pointer-events-auto">
+                  <div className="text-sm font-medium mb-3">Versiooni detailid</div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="[&>th]:px-3 [&>th]:py-2 text-gray-300">
+                          {Object.keys(drawer.props).map((k) => (
+                            <th key={k} className="text-left whitespace-nowrap border-b border-gray-700">{FIELD_LABELS[k] ?? k}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="[&>td]:px-3 [&>td]:py-2">
+                          {Object.keys(drawer.props).map((k) => (
+                            <td key={k} className="border-b border-gray-700 align-top break-all">{String(drawer.props?.[k] ?? '')}</td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>  {/* ← see sulgeb "absolute left-0 right-0 bottom-0" div-i */}
+          )}        {/* ← see sulgeb selectedKeys.length > 0 tingimuse */}
 
           {/* Toast (top-right) */}
           {toast && (
